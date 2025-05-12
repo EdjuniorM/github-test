@@ -72,24 +72,32 @@ jobs:
       - name: Generate GitHub App token
         id: app_token
         run: |
-          node <<EOF
+          node <<'EOF'
           const { createAppAuth } = require("@octokit/auth-app");
 
+          const appId = process.env.APP_ID;
+          const privateKey = Buffer.from(process.env.BYPASS_RELEASE_KEY, 'base64').toString();
+          const installationId = process.env.APP_INSTALLATION_ID;
+
           const auth = createAppAuth({
-            appId: process.env.APP_ID,
-            privateKey: Buffer.from(process.env.BYPASS_RELEASE_KEY, 'base64').toString(),
-            installationId: process.env.APP_INSTALLATION_ID,
+            appId,
+            privateKey,
+            installationId,
           });
 
           auth({ type: "installation" }).then(authResult => {
             console.log("::add-mask::" + authResult.token);
             console.log("::set-output name=token::" + authResult.token);
+          }).catch(error => {
+            console.error("Failed to authenticate:", error);
+            process.exit(1);
           });
           EOF
         env:
           APP_ID: ${{ secrets.APP_ID }}
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
+
 
 
 
