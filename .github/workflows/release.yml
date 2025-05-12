@@ -93,10 +93,13 @@ jobs:
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
-          # Configuração segura do git
-          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic $(echo -n x-access-token:$TOKEN | base64)"
-          
-          # Cria e faz push da branch
+          # Remove configurações prévias
+          git config --global --unset http.https://github.com/.extraheader
+
+          # Configura o remote com o token
+          git remote set-url origin https://x-access-token:$TOKEN@github.com/${{ github.repository }}.git
+
+          # Push da branch
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
           git push origin HEAD:release/${{ steps.bump_version.outputs.new_version }} \
             --force-with-lease \
