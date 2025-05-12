@@ -56,20 +56,22 @@ jobs:
           new_version=${{ steps.bump_version.outputs.new_version }}
           sed -i "s/version: .*/version: $new_version/" pubspec.yaml
 
-      - name: Configure Git
-        run: |
-          git config --local user.name "GitHub App"
-          git config --local user.email "app@github.com"
-
       - name: Commit changes
         run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
           git add pubspec.yaml
           git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}"
 
-      - name: Install auth library
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Octokit auth lib
         run: npm install @octokit/auth-app
 
-      - name: Generate GitHub App token (debug)
+      - name: Generate GitHub App token
         id: app_token
         run: |
           node <<'EOF'
@@ -79,19 +81,12 @@ jobs:
           const privateKey = Buffer.from(process.env.BYPASS_RELEASE_KEY, 'base64').toString();
           const installationId = process.env.APP_INSTALLATION_ID;
 
-          console.log("appId:", appId);
-          console.log("installationId:", installationId);
-
           if (!appId || !installationId || !privateKey) {
             console.error("❌ Uma das variáveis está faltando.");
             process.exit(1);
           }
 
-          const auth = createAppAuth({
-            appId,
-            privateKey,
-            installationId,
-          });
+          const auth = createAppAuth({ appId, privateKey, installationId });
 
           auth({ type: "installation" }).then(authResult => {
             console.log("::add-mask::" + authResult.token);
@@ -106,14 +101,10 @@ jobs:
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
 
-
-
-
-
-      - name: Push release branch using GitHub App token
+      - name: Criar branch release via API com GitHub App
+        uses: peterjgrainger/action-create-branch@v2.2.0
         env:
-          TOKEN: ${{ steps.app_token.outputs.token }}
-        run: |
-          git checkout -b release/${{ steps.bump_version.outputs.new_version }}
-          git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }} HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
-
+          GITHUB_TOKEN: ${{ steps.app_token.outputs.token }}
+        with:
+          branch: release/${{ steps.bump_version.outputs.new_version }}
+          sha: ${{ github.sha }}
