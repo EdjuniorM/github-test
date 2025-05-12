@@ -115,5 +115,10 @@ jobs:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
-          git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }} HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
+
+          # Reconfigura a origem com o token correto
+          git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}
+
+          # Agora faz o push com o token do GitHub App
+          git push origin HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
 
