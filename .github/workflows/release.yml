@@ -1,5 +1,5 @@
 name: Create Release
-run-name: Create ${{ github.event.inputs.release_type }} release via GitHub App
+run-name: Create ${{ github.event.inputs.release_type }} release by @${{ github.actor }}
 
 on:
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.release_type == 'patch' && 'main' || 'dev' }}
-          fetch-depth: 0  # Necessário para operações Git posteriores
+          fetch-depth: 0
 
       - name: Get current version
         id: get_version
@@ -57,43 +57,47 @@ jobs:
           new_version=${{ steps.bump_version.outputs.new_version }}
           sed -i "s/version: .*/version: $new_version/" pubspec.yaml
 
-      - name: Commit changes as GitHub App
+      - name: Commit changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
           git add pubspec.yaml
-          git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }} [skip ci]"
+          git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}"
 
-      - name: Generate GitHub App Token
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate GitHub App token
         id: app_token
         uses: tibdex/github-app-token@v1
         with:
           app_id: ${{ secrets.APP_ID }}
           private_key: ${{ secrets.BYPASS_RELEASE_KEY }}
-          repository: ${{ github.repository }}
           permissions: |
             {
               "contents": "write"
             }
 
-      - name: Verify App Permissions
+      - name: Verificar permissões do App no repositório
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
-          echo "Token (prefix): ${TOKEN:0:10}..."
+          echo "🔍 Verificando permissões reais com token do App..."
           curl -s -H "Authorization: token $TOKEN" \
                -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/repos/${{ github.repository }} | jq .permissions
+               https://api.github.com/installation/repositories | jq
 
-      - name: Push as GitHub App
+      - name: Push release branch
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
+          git config --global --unset http.https://github.com/.extraheader
+          git remote set-url origin https://x-access-token:$TOKEN@github.com/${{ github.repository }}.git
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
-          git push "https://x-access-token:$TOKEN@github.com/${{ github.repository }}.git" \
-            HEAD:release/${{ steps.bump_version.outputs.new_version }} \
-            --force-with-lease \
-            --verbose
+          git push origin HEAD:release/${{ steps.bump_version.outputs.new_version }} \
+            --force-with-lease --verbose
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
@@ -102,5 +106,5 @@ jobs:
           branch: release/${{ steps.bump_version.outputs.new_version }}
           base: main
           title: "Release ${{ steps.bump_version.outputs.new_version }}"
-          body: "Automated release version bump via GitHub App"
-          labels: "release"
+          body: "Automated release version bump"
+          draft: false
