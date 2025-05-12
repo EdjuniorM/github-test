@@ -14,6 +14,9 @@ on:
           - 'minor'
           - 'patch'
 
+permissions:
+  contents: write  # Garante permissão para commit e push
+
 jobs:
   create_release:
     runs-on: ubuntu-latest
@@ -59,52 +62,12 @@ jobs:
 
       - name: Commit changes
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
           git add pubspec.yaml
           git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Generate GitHub App token
-        id: app_token
-        uses: tibdex/github-app-token@v1
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.BYPASS_RELEASE_KEY }}
-          permissions: |
-            {
-              "contents": "write"
-            }
-
-      - name: Verificar permissões do App no repositório
-        env:
-          TOKEN: ${{ steps.app_token.outputs.token }}
-        run: |
-          echo "🔍 Verificando permissões reais com token do App..."
-          curl -s -H "Authorization: token $TOKEN" \
-               -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/installation/repositories | jq
-
       - name: Push release branch
-        env:
-          TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
-          git config --global --unset http.https://github.com/.extraheader
-          git remote set-url origin https://x-access-token:$TOKEN@github.com/${{ github.repository }}.git
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
-          git push origin HEAD:release/${{ steps.bump_version.outputs.new_version }} \
-            --force-with-lease --verbose
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ steps.app_token.outputs.token }}
-          branch: release/${{ steps.bump_version.outputs.new_version }}
-          base: main
-          title: "Release ${{ steps.bump_version.outputs.new_version }}"
-          body: "Automated release version bump"
-          draft: false
+          git push origin HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
