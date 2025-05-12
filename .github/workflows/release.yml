@@ -73,8 +73,8 @@ jobs:
         id: app_token
         uses: tibdex/github-app-token@v1
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.BYPASS_RELEASE_KEY }}
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.BYPASS_RELEASE_KEY }}
           permissions: |
             {
               "contents": "write"
