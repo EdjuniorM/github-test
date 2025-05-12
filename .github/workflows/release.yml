@@ -110,15 +110,25 @@ jobs:
 
 
 
-      - name: Push release branch using GitHub App token
+      - name: Push release branch using GitHub App token (com logs)
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
+          echo "::group::🔐 Verificando token gerado"
+          echo "TOKEN START >>>"
+          echo "${TOKEN:0:4}...${TOKEN: -4}"  # mostra só parte do token
+          echo "TOKEN LENGTH: ${#TOKEN}"
+          echo "<<< TOKEN END"
+          echo "::endgroup::"
+
+          echo "::group::🔧 Configurando repositório"
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
-
-          # Reconfigura a origem com o token correto
+          git remote -v
           git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}
+          git remote -v
+          echo "::endgroup::"
 
-          # Agora faz o push com o token do GitHub App
+          echo "::group::🚀 Pushando a branch"
           git push origin HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
+          echo "::endgroup::"
 
