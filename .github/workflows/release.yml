@@ -69,7 +69,7 @@ jobs:
       - name: Install auth library
         run: npm install @octokit/auth-app
 
-      - name: Generate GitHub App token
+      - name: Generate GitHub App token (debug)
         id: app_token
         run: |
           node <<'EOF'
@@ -78,6 +78,14 @@ jobs:
           const appId = process.env.APP_ID;
           const privateKey = Buffer.from(process.env.BYPASS_RELEASE_KEY, 'base64').toString();
           const installationId = process.env.APP_INSTALLATION_ID;
+
+          console.log("appId:", appId);
+          console.log("installationId:", installationId);
+
+          if (!appId || !installationId || !privateKey) {
+            console.error("❌ Uma das variáveis está faltando.");
+            process.exit(1);
+          }
 
           const auth = createAppAuth({
             appId,
@@ -89,7 +97,7 @@ jobs:
             console.log("::add-mask::" + authResult.token);
             console.log("::set-output name=token::" + authResult.token);
           }).catch(error => {
-            console.error("Failed to authenticate:", error);
+            console.error("❌ Falha na autenticação:", error);
             process.exit(1);
           });
           EOF
@@ -97,6 +105,7 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
+
 
 
 
