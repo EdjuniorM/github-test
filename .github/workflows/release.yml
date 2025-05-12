@@ -101,10 +101,17 @@ jobs:
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
 
-      - name: Criar branch release via API com GitHub App
-        uses: peterjgrainger/action-create-branch@v2.2.0
+      - name: Criar branch via API com curl
         env:
-          GITHUB_TOKEN: ${{ steps.app_token.outputs.token }}
-        with:
-          branch: release/${{ steps.bump_version.outputs.new_version }}
-          sha: ${{ github.sha }}
+          TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          curl -X POST https://api.github.com/repos/${{ github.repository }}/git/refs \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -d @- <<EOF
+          {
+            "ref": "refs/heads/release/${{ steps.bump_version.outputs.new_version }}",
+            "sha": "${{ github.sha }}"
+          }
+          EOF
+
