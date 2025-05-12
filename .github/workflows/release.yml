@@ -115,4 +115,5 @@ jobs:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
-          git push https://x-access-token:$TOKEN@github.com/${{ github.repository }} HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
+          git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }} HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
+
