@@ -66,18 +66,10 @@ jobs:
           git add pubspec.yaml
           git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}"
 
-      - name: Install Node.js (for auth script)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install auth library
-        run: npm install -g @octokit/auth-app
-
       - name: Generate GitHub App token
         id: app_token
         run: |
-          node <<EOF
+          npx --yes @octokit/auth-app <<'EOF'
           const { createAppAuth } = require("@octokit/auth-app");
 
           const auth = createAppAuth({
@@ -95,6 +87,7 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
+
 
       - name: Push release branch using GitHub App token
         env:
