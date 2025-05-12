@@ -123,8 +123,14 @@ jobs:
 
           echo "::group::🔧 Configurando repositório"
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
+
+          # Remover credential helper que trava o github-actions[bot]
+          git config --global credential.helper ""
+
+          # Resetar origin e adicionar nova com token correto
           git remote remove origin
           git remote add origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}
+
           git remote -v
           echo "::endgroup::"
 
