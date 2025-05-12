@@ -58,8 +58,8 @@ jobs:
 
       - name: Commit changes
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          git config user.name "GitHub App"
+          git config user.email "app@github.com"
           git add pubspec.yaml
           git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}"
 
@@ -101,17 +101,18 @@ jobs:
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
 
-      - name: Criar branch via API com curl
+      - name: Push release branch using GitHub App token
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
-          curl -X POST https://api.github.com/repos/${{ github.repository }}/git/refs \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -d @- <<EOF
-          {
-            "ref": "refs/heads/release/${{ steps.bump_version.outputs.new_version }}",
-            "sha": "${{ github.sha }}"
-          }
-          EOF
+          git checkout -b release/${{ steps.bump_version.outputs.new_version }}
 
+          # Remover helper que usa o token default
+          git config --global credential.helper ""
+
+          # Redefinir o remote com o token correto
+          git remote remove origin
+          git remote add origin https://x-access-token:$TOKEN@github.com/${{ github.repository }}
+
+          # Push da nova branch com commit
+          git push origin HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
