@@ -1,5 +1,6 @@
 name: Create Release
 run-name: Create ${{ github.event.inputs.release_type }} release by @${{ github.actor }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -54,20 +55,50 @@ jobs:
         run: |
           new_version=${{ steps.bump_version.outputs.new_version }}
           sed -i "s/version: .*/version: $new_version/" pubspec.yaml
-      
+
       - name: Configure Git
         run: |
-          git config --local user.name "GitHub Actions"
-          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub App"
+          git config --local user.email "app@github.com"
 
       - name: Commit changes
         run: |
           git add pubspec.yaml
           git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}"
-          git push
 
-      - name: Create GitHub release
+      - name: Install Node.js (for auth script)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install auth library
+        run: npm install -g @octokit/auth-app
+
+      - name: Generate GitHub App token
+        id: app_token
+        run: |
+          node <<EOF
+          const { createAppAuth } = require("@octokit/auth-app");
+
+          const auth = createAppAuth({
+            appId: process.env.APP_ID,
+            privateKey: Buffer.from(process.env.BYPASS_RELEASE_KEY, 'base64').toString(),
+            installationId: process.env.APP_INSTALLATION_ID,
+          });
+
+          auth({ type: "installation" }).then(authResult => {
+            console.log("::add-mask::" + authResult.token);
+            console.log("::set-output name=token::" + authResult.token);
+          });
+          EOF
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
+          BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
+
+      - name: Push release branch using GitHub App token
+        env:
+          TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
-          git push origin release/${{ steps.bump_version.outputs.new_version }}
-
+          git push https://x-access-token:$TOKEN@github.com/${{ github.repository }} HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
