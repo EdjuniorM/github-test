@@ -100,14 +100,14 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
+
       - name: List repositórios da instalação
-  env:
-    TOKEN: ${{ steps.app_token.outputs.token }}
-  run: |
-    curl -s -H "Authorization: token $TOKEN" \
-         -H "Accept: application/vnd.github.v3+json" \
-         https://api.github.com/installation/repositories | jq
-         
+        env:
+          TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          curl -s -H "Authorization: token $TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/installation/repositories | jq
 
       - name: Check identity of GitHub App token
         env:
