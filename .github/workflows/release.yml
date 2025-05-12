@@ -22,6 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.release_type == 'patch' && 'main' || 'dev' }}
+          fetch-depth: 0  # Importante para operações git posteriores
 
       - name: Get current version
         id: get_version
@@ -58,8 +59,8 @@ jobs:
 
       - name: Commit changes
         run: |
-          git config user.name "GitHub App"
-          git config user.email "app@github.com"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
           git add pubspec.yaml
           git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}"
 
@@ -68,67 +69,45 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Octokit auth lib
-        run: npm install @octokit/auth-app
-
       - name: Generate GitHub App token
         id: app_token
-        run: |
-          node <<'EOF'
-          const { createAppAuth } = require("@octokit/auth-app");
+        uses: tibdex/github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.BYPASS_RELEASE_KEY }}
+          permissions: |
+            {
+              "contents": "write"
+            }
 
-          const appId = process.env.APP_ID;
-          const privateKey = Buffer.from(process.env.BYPASS_RELEASE_KEY, 'base64').toString();
-          const installationId = process.env.APP_INSTALLATION_ID;
-
-          if (!appId || !installationId || !privateKey) {
-            console.error("❌ Uma das variáveis está faltando.");
-            process.exit(1);
-          }
-
-          const auth = createAppAuth({ appId, privateKey, installationId });
-
-          auth({ type: "installation" }).then(authResult => {
-            console.log("::add-mask::" + authResult.token);
-            console.log("::set-output name=token::" + authResult.token);
-          }).catch(error => {
-            console.error("❌ Falha na autenticação:", error);
-            process.exit(1);
-          });
-          EOF
-        env:
-          APP_ID: ${{ secrets.APP_ID }}
-          APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
-          BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
-
-      - name: List repositórios da instalação
+      - name: Debug - Verify token permissions
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
+          echo "Verificando permissões do token..."
           curl -s -H "Authorization: token $TOKEN" \
                -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/installation/repositories | jq
+               https://api.github.com/repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission | jq
 
-      - name: Check identity of GitHub App token
+      - name: Push release branch
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
-          curl -s -H "Authorization: token $TOKEN" \
-               -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/user
-
-      - name: Push release branch using GitHub App token
-        env:
-          TOKEN: ${{ steps.app_token.outputs.token }}
-        run: |
+          # Configuração segura do git
+          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic $(echo -n x-access-token:$TOKEN | base64)"
+          
+          # Cria e faz push da branch
           git checkout -b release/${{ steps.bump_version.outputs.new_version }}
+          git push origin HEAD:release/${{ steps.bump_version.outputs.new_version }} \
+            --force-with-lease \
+            --verbose
 
-          # Remover helper que usa o token default
-          git config --global credential.helper ""
-
-          # Redefinir o remote com o token correto
-          git remote remove origin
-          git remote add origin https://x-access-token:$TOKEN@github.com/${{ github.repository }}
-
-          # Push da nova branch com commit
-          git push origin HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ steps.app_token.outputs.token }}
+          branch: release/${{ steps.bump_version.outputs.new_version }}
+          base: main
+          title: "Release ${{ steps.bump_version.outputs.new_version }}"
+          body: "Automated release version bump"
+          draft: false
