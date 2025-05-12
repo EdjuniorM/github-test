@@ -101,14 +101,10 @@ jobs:
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BYPASS_RELEASE_KEY: ${{ secrets.BYPASS_RELEASE_KEY }}
 
-
-
-
-
-      - name: Push release branch using GitHub App token
+      - name: Criar branch release via API com GitHub App
+        uses: peterjgrainger/action-create-branch@v2.2.0
         env:
-          TOKEN: ${{ steps.app_token.outputs.token }}
-        run: |
-          git checkout -b release/${{ steps.bump_version.outputs.new_version }}
-          git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }} HEAD:refs/heads/release/${{ steps.bump_version.outputs.new_version }}
-
+          GITHUB_TOKEN: ${{ steps.app_token.outputs.token }}
+        with:
+          branch: release/${{ steps.bump_version.outputs.new_version }}
+          sha: ${{ github.sha }}
